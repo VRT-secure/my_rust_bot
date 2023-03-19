@@ -1,7 +1,6 @@
 use teloxide::prelude::*;
 
-#[tokio::main]
-async fn main() {
+async fn my_function() {
     pretty_env_logger::init();
     log::debug!("Starting throw dice bot...");
 
@@ -11,5 +10,5 @@ async fn main() {
         bot.send_message(msg.chat.id, "hello").await?;
         Ok(())
     }).await;
-    
 }
+
