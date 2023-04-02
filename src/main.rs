@@ -3,7 +3,7 @@ use teloxide::{
     prelude::*,
     types::{
         InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputMessageContent,
-        InputMessageContentText, Me, Currency,
+        InputMessageContentText, Me,
     },
     utils::command::BotCommands,
 };
@@ -115,19 +115,19 @@ async fn inline_query_handler(
 async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<()> {
     if let Some(char_code) = q.data {
         let currency = parse_site::get_currency_struct(URL, char_code.as_str()).await?;
+        let text = format!("Char code: {}\nunit: {}\ncurrency: {}\nrate: {}", currency.char_code, currency.unit, currency.curr, currency.rate);
+        
+        
+        
         // Tell telegram that we've seen this query, to remove 🕑 icons from the
         // clients. You could also use `answer_callback_query`'s optional
         // parameters to tweak what happens on the client side.
         bot.answer_callback_query(q.id).await?;
        
-        let text = format!("Char code: {}\nunit: {}\ncurrency: {}\nrate: {}", currency.char_code, currency.unit, currency.curr, currency.rate);
-       
        
         // Edit text of the message to which the buttons were attached
-        if let Some(Message { id, chat, .. }) = q.message {
-            bot.edit_message_text(chat.id, id, text).await?;
-        } else if let Some(id) = q.inline_message_id {
-            bot.edit_message_text_inline(id, text).await?;
+        if let Some(Message {chat, .. }) = q.message {
+            bot.send_message(chat.id, text).await?;
         }
 
         log::info!("You chose: {}", char_code);
@@ -135,3 +135,4 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<()> {
 
     Ok(())
 }
+
