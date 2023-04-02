@@ -1,14 +1,16 @@
-use std::error::Error;
 use teloxide::{
     payloads::SendMessageSetters,
     prelude::*,
     types::{
         InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputMessageContent,
-        InputMessageContentText, Me,
+        InputMessageContentText, Me, Currency,
     },
     utils::command::BotCommands,
 };
-mod parse_xml;
+mod parse_site;
+use anyhow::{Result};
+
+static URL: &str = "https://www.cbr.ru/eng/currency_base/daily/";
 
 
 
@@ -22,7 +24,7 @@ enum Command {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() -> Result<()> {
     pretty_env_logger::init();
     log::info!("Starting buttons bot...");
 
@@ -38,19 +40,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Creates a keyboard made by buttons in a big column.
-fn make_keyboard() -> InlineKeyboardMarkup {
+async fn make_keyboard() -> InlineKeyboardMarkup {
     let mut keyboard: Vec<Vec<InlineKeyboardButton>> = vec![];
 
-    let url = "https://www.cbr-xml-daily.ru/daily_eng_utf8.xml";
-    let char_codes = match parse_xml::get_char_codes_of_currencies(url) {
+    let vec_currency = match parse_site::get_currencyes_codes(URL).await{
         Ok(v) => {v},
         Err(e) => {
             eprintln!("Error downloading XML file: {}", e);
             vec!["Error".to_string()]
         },
     };
-
-    for versions in char_codes.chunks(3) {
+    for versions in vec_currency.chunks(3) {
         let row = versions
             .iter()
             .map(|version| InlineKeyboardButton::callback(version.to_owned(), version.to_owned()))
@@ -69,7 +69,7 @@ async fn message_handler(
     bot: Bot,
     msg: Message,
     me: Me,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<()> {
     if let Some(text) = msg.text() {
         match BotCommands::parse(text, me.username()) {
             Ok(Command::Help) => {
@@ -78,8 +78,8 @@ async fn message_handler(
             }
             Ok(Command::Start) => {
                 // Create a list of buttons and send them.
-                let keyboard = make_keyboard();
-                bot.send_message(msg.chat.id, "Debian versions:").reply_markup(keyboard).await?;
+                let keyboard = make_keyboard().await;
+                bot.send_message(msg.chat.id, "Choice currency:").reply_markup(keyboard).await?;
             }
 
             Err(_) => {
@@ -94,15 +94,15 @@ async fn message_handler(
 async fn inline_query_handler(
     bot: Bot,
     q: InlineQuery,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let choose_debian_version = InlineQueryResultArticle::new(
+) -> Result<()> {
+    let choose_cyrrency = InlineQueryResultArticle::new(
         "0",
         "Chose currency",
         InputMessageContent::Text(InputMessageContentText::new("Currencyes:")),
     )
-    .reply_markup(make_keyboard());
+    .reply_markup(make_keyboard().await);
 
-    bot.answer_inline_query(q.id, vec![choose_debian_version.into()]).await?;
+    bot.answer_inline_query(q.id, vec![choose_cyrrency.into()]).await?;
 
     Ok(())
 }
@@ -112,15 +112,17 @@ async fn inline_query_handler(
 ///
 /// **IMPORTANT**: do not send privacy-sensitive data this way!!!
 /// Anyone can read data stored in the callback button.
-async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Error + Send + Sync>> {
-    if let Some(version) = q.data {
-        let text = format!("You chose: {version}");
-
+async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<()> {
+    if let Some(char_code) = q.data {
+        let currency = parse_site::get_currency_struct(URL, char_code.as_str()).await?;
         // Tell telegram that we've seen this query, to remove 🕑 icons from the
         // clients. You could also use `answer_callback_query`'s optional
         // parameters to tweak what happens on the client side.
         bot.answer_callback_query(q.id).await?;
-
+       
+        let text = format!("Char code: {}\nunit: {}\ncurrency: {}\nrate: {}", currency.char_code, currency.unit, currency.curr, currency.rate);
+       
+       
         // Edit text of the message to which the buttons were attached
         if let Some(Message { id, chat, .. }) = q.message {
             bot.edit_message_text(chat.id, id, text).await?;
@@ -128,7 +130,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<(), Box<dyn Erro
             bot.edit_message_text_inline(id, text).await?;
         }
 
-        log::info!("You chose: {}", version);
+        log::info!("You chose: {}", char_code);
     }
 
     Ok(())
