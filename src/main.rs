@@ -3,15 +3,13 @@ use teloxide::{
     prelude::*,
     types::{
         InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputMessageContent,
-        InputMessageContentText, Me,
+        InputMessageContentText, Me,ReplyMarkup, KeyboardButton, KeyboardMarkup
     },
     utils::command::BotCommands,
 };
 mod parse_site;
 use anyhow::{Result};
-
 static URL: &str = "https://www.cbr.ru/eng/currency_base/daily/";
-
 
 
 #[derive(BotCommands)]
@@ -127,7 +125,7 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<()> {
        
         // Edit text of the message to which the buttons were attached
         if let Some(Message {chat, .. }) = q.message {
-            bot.send_message(chat.id, text).await?;
+            bot.send_message(chat.id, text).reply_markup(send_keyboard()).send().await?;
         }
 
         log::info!("You chose: {}", char_code);
@@ -135,4 +133,16 @@ async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<()> {
 
     Ok(())
 }
+
+fn send_keyboard() -> ReplyMarkup {
+    let kb = vec![
+        KeyboardButton::new("Button 1"),
+        KeyboardButton::new("Button 2"),
+    ];
+ 
+    let markup = KeyboardMarkup::new(vec![kb])
+    .resize_keyboard(true);
+ 
+    ReplyMarkup::Keyboard(markup)
+ }
 
