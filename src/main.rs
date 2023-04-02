@@ -2,7 +2,7 @@ use teloxide::prelude::*;
 mod parse_site;
 use anyhow::{Result};
 mod bot_logic;
-
+mod convert_currencyes;
 
 
 #[tokio::main]

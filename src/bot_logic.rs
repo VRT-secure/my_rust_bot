@@ -63,7 +63,7 @@ pub async fn message_handler(
 
             Ok(Command::Start) => {
                 // Create keyboard buttons and send them.
-                bot.send_message(msg.chat.id, "Choice currency:").reply_markup(send_keyboard()).send().await?;
+                bot.send_message(msg.chat.id, "Отправьте команду").reply_markup(send_keyboard()).send().await?;
             }
 
             Err(_) => {
@@ -78,13 +78,15 @@ pub async fn message_handler(
 }
 
 async fn text_handler(bot: &Bot, msg: &Message, text: &str) -> Result<()>{
+    let keyboard = make_keyboard().await;
     match text {
         "Узнать курс фалюты" => {
-            let keyboard = make_keyboard().await;
             bot.send_message(msg.chat.id, "Выберите валюту").reply_markup(keyboard).send().await?;
         }
         "Калькулятор валют" => {
-            bot.send_message(msg.chat.id, "Выберите валюту").await?;
+            bot.send_message(msg.chat.id, "Выберите первую валюту").reply_markup(keyboard).send().await?;
+            let keyboard_2 = make_keyboard().await;
+            bot.send_message(msg.chat.id, "Выберите вторую валюту").reply_markup(keyboard_2).send().await?;
         }
         _ => {
             bot.send_message(msg.chat.id, "Command not found!").await?;

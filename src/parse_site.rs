@@ -1,6 +1,5 @@
 use scraper::{Html, Selector};
 use reqwest::get;
-use std::io;
 use anyhow::{Result, Error};
 
 
