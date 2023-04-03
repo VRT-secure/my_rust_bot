@@ -27,8 +27,6 @@ async fn get_currencyes(url: &str) -> Result<Vec<String>>{
 } 
 
 
-
-
 pub struct Currency {
     pub char_code: String,
     pub unit: String,
@@ -36,20 +34,6 @@ pub struct Currency {
     pub rate: String,
 }
 
-// pub async fn get_currency_struct(url: &str, charcode: &str) -> Result<Currency, Box<dyn Error>>{
-//     let vec_currencyes = get_currencyes(url).await?;
-//     if let Some(index) = vec_currencyes.iter().position(|x| x == charcode) {
-//         let unswer = Currency {
-//             char_code: vec_currencyes[index].clone(),
-//             unit: vec_currencyes[index + 1].clone(),
-//             curr: vec_currencyes[index + 2].clone(),
-//             rate: vec_currencyes[index + 3].clone(),
-//         };      
-//         Ok(unswer)      
-//     } else {
-//         Err(Box::new(io::Error::new(io::ErrorKind::Other, format!("Currency with char code {} not found", charcode))))
-//     }
-// }
 
 pub async fn get_currency_struct(url: &str, charcode: &str) -> Result<Currency> {
     let vec_currencyes = get_currencyes(url).await?;

@@ -12,7 +12,7 @@ use teloxide::{
 use crate::parse_site;
 
 
-static URL: &str = "https://www.cbr.ru/eng/currency_base/daily/";
+pub static URL: &str = "https://www.cbr.ru/eng/currency_base/daily/";
 
 #[derive(BotCommands)]
 #[command(rename_rule = "lowercase", description = "The bot show currency prices. These commands are supported:")]
