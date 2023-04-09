@@ -1,27 +1,31 @@
-
-use anyhow::{Result};
 use teloxide::{
     payloads::SendMessageSetters,
     prelude::*,
+    dispatching::{dialogue, UpdateHandler},
     types::{
         InlineKeyboardButton, InlineKeyboardMarkup, InlineQueryResultArticle, InputMessageContent,
         InputMessageContentText, Me,ReplyMarkup, KeyboardButton, KeyboardMarkup
     },
     utils::command::BotCommands,
 };
+use teloxide::{dispatching::dialogue::InMemStorage};
 use crate::parse_site;
+use crate::convert_currencyes::*;
 
 
 pub static URL: &str = "https://www.cbr.ru/eng/currency_base/daily/";
 
-#[derive(BotCommands)]
-#[command(rename_rule = "lowercase", description = "The bot show currency prices. These commands are supported:")]
-enum Command {
-    #[command(description = "Display this text")]
+#[derive(BotCommands, Clone)]
+#[command(rename_rule = "lowercase", description = "These commands are supported:")]
+pub enum Command {
+    #[command(description = "display this text.")]
     Help,
-    #[command(description = "Start")]
+    #[command(description = "start the purchase procedure.")]
     Start,
+    #[command(description = "cancel the purchase procedure.")]
+    Cancel,
 }
+
 
 /// Creates a keyboard made by buttons in a big column.
 async fn make_keyboard() -> InlineKeyboardMarkup {
@@ -53,7 +57,7 @@ pub async fn message_handler(
     bot: Bot,
     msg: Message,
     me: Me,
-) -> Result<()> {
+) -> HandlerResult {
     if let Some(text) = msg.text() {
         match BotCommands::parse(text, me.username()) {
             Ok(Command::Help) => {
@@ -65,7 +69,8 @@ pub async fn message_handler(
                 // Create keyboard buttons and send them.
                 bot.send_message(msg.chat.id, "Отправьте команду").reply_markup(send_keyboard()).send().await?;
             }
-
+            Ok(Command::Cancel) => {
+            }
             Err(_) => {
                 // Handle non-command text messages here.
                 text_handler(&bot, &msg, text).await?;
@@ -76,17 +81,51 @@ pub async fn message_handler(
 
     Ok(())
 }
+fn convert_currencyes_handler() -> HandlerResult{
+    use dptree::case;
 
-async fn text_handler(bot: &Bot, msg: &Message, text: &str) -> Result<()>{
+    let message_convert_handler = Update::filter_message().branch(
+        teloxide::filter_command::<Command, _>()
+        .branch(case![Command::Help].endpoint(help))
+        .branch(case![State::Start]
+                    .branch(case![Command::Start].endpoint(start)),
+                )
+            .branch(case![Command::Cancel].endpoint(cancel)),
+    );
+
+    let convert_currencyes_handler = Update::filter_callback_query()
+        .branch(case![State::ChooseFirstCurrency].endpoint(receive_first_currency))
+        .branch(case![State::ChooseSecondCurrency { first_currency }].endpoint(receive_second_currency))
+        .branch(case![State::Amount { first_currency, second_currency }].endpoint(receive_amount));
+
+    Ok(())
+}
+
+pub fn schema() -> UpdateHandler<Box<dyn std::error::Error + Send + Sync + 'static>> {
+
+
+    let command_handler = Update::filter_message().endpoint(message_handler);
+    let callback_handler = Update::filter_callback_query().endpoint(callback_handler);
+    let inline_query_handler = Update::filter_inline_query().endpoint(inline_query_handler);
+
+    dialogue::enter::<Update, InMemStorage<State>, State, _>()
+        .branch(command_handler)
+        .branch(callback_handler)
+        .branch(inline_query_handler)
+}
+
+
+async fn text_handler(bot: &Bot, msg: &Message, text: &str) -> HandlerResult{
     let keyboard = make_keyboard().await;
     match text {
         "Узнать курс фалюты" => {
             bot.send_message(msg.chat.id, "Выберите валюту").reply_markup(keyboard).send().await?;
         }
         "Калькулятор валют" => {
-            bot.send_message(msg.chat.id, "Выберите первую валюту").reply_markup(keyboard).send().await?;
-            let keyboard_2 = make_keyboard().await;
-            bot.send_message(msg.chat.id, "Выберите вторую валюту").reply_markup(keyboard_2).send().await?;
+            // bot.send_message(msg.chat.id, "Выберите валюту").reply_markup(keyboard).send().await?;
+            // let keyboard_2 = make_keyboard().await;
+            // bot.send_message(msg.chat.id, "Выберите вторую валюту").reply_markup(keyboard_2).send().await?;
+            convert_currencyes_handler()?;
         }
         _ => {
             bot.send_message(msg.chat.id, "Command not found!").await?;
@@ -100,7 +139,7 @@ async fn text_handler(bot: &Bot, msg: &Message, text: &str) -> Result<()>{
 pub async fn inline_query_handler(
     bot: Bot,
     q: InlineQuery,
-) -> Result<()> {
+) -> HandlerResult {
     let choose_cyrrency = InlineQueryResultArticle::new(
         "0",
         "Chose currency",
@@ -118,7 +157,7 @@ pub async fn inline_query_handler(
 ///
 /// **IMPORTANT**: do not send privacy-sensitive data this way!!!
 /// Anyone can read data stored in the callback button.
-pub async fn callback_handler(bot: Bot, q: CallbackQuery) -> Result<()> {
+pub async fn callback_handler(bot: Bot, q: CallbackQuery) -> HandlerResult {
     if let Some(char_code) = q.data {
         let currency = parse_site::get_currency_struct(URL, char_code.as_str()).await?;
         let text = format!("Char code: {}\nunit: {}\ncurrency: {}\nrate: {}", currency.char_code, currency.unit, currency.curr, currency.rate);
@@ -153,4 +192,16 @@ fn send_keyboard() -> ReplyMarkup {
  
     ReplyMarkup::Keyboard(markup)
  }
+
+async fn help(bot: Bot, msg: Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, Command::descriptions().to_string()).await?;
+    Ok(())
+}
+
+async fn cancel(bot: Bot, dialogue: MyDialogue, msg: Message) -> HandlerResult {
+    bot.send_message(msg.chat.id, "Cancelling the dialogue.").await?;
+    dialogue.exit().await?;
+    Ok(())
+}
+
 
